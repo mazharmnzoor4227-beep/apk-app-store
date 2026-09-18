@@ -17,7 +17,7 @@ class UpdateWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
         if (StoreConfig.backendUrl(applicationContext).isBlank()) return Result.success()
         return try {
             val apps = StoreApi.apps(applicationContext)
-            val updates = apps.filter { StoreApi.installedState(applicationContext, it).updateAvailable }
+            val updates = apps.filter { it.owned && StoreApi.installedState(applicationContext, it).updateAvailable }
             if (updates.isEmpty()) return Result.success()
             createChannel()
             if (StoreConfig.autoDownloadOnWifi(applicationContext) && isWifi()) {
