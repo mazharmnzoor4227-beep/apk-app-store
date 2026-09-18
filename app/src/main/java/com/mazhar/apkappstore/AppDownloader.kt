@@ -22,12 +22,19 @@ object AppDownloader {
             throw OpenHandledException()
         }
 
-        require(app.downloadUrl.startsWith("https://") || app.downloadUrl.startsWith("http://")) { "Invalid download URL" }
+        require(app.downloadUrl.startsWith("https://") || app.downloadUrl.startsWith("http://")) { "App is not unlocked for download" }
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(dir, "${app.packageName}-${app.versionCode}.apk")
-        val request = Request.Builder().url(app.downloadUrl).get().build()
+        val request = Request.Builder()
+            .url(app.downloadUrl)
+            .header("x-customer-key", StoreConfig.customerKey(context))
+            .get()
+            .build()
         StoreApi.client().newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("Download failed: ${response.code}")
+            if (!response.isSuccessful) {
+                if (response.code == 402) error("Purchase approval is required before downloading this app")
+                error("Download failed: ${response.code}")
+            }
             val body = response.body ?: error("Empty download")
             val total = body.contentLength()
             body.byteStream().use { input ->
