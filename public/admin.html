@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>APK App Store Admin</title>
+<style>
+:root{color-scheme:dark;--bg:#080a0f;--panel:#11141c;--panel2:#171b25;--text:#f5f7fb;--muted:#a5acba;--line:#262c39;--a:#7180ff;--b:#9b6cff;--good:#7fe0a0;--bad:#ff8181}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#1a1e44 0,transparent 30%),var(--bg);font:14px system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text)}header{padding:28px 22px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#080a0fe8;backdrop-filter:blur(18px);z-index:5}header h1{margin:0;font-size:27px}header p{margin:5px 0 0;color:var(--muted)}main{max-width:1100px;margin:auto;padding:24px;display:grid;grid-template-columns:1.2fr .8fr;gap:18px}@media(max-width:850px){main{grid-template-columns:1fr;padding:14px}}.card{background:linear-gradient(180deg,#121620,#0e1118);border:1px solid var(--line);border-radius:24px;padding:20px;box-shadow:0 16px 50px #0005}.card h2{margin:0 0 16px;font-size:19px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:600px){.grid{grid-template-columns:1fr}}label{display:block;color:var(--muted);font-size:12px;margin:3px 0 6px}input,textarea,select{width:100%;border:1px solid #303747;background:#0b0e14;color:#fff;border-radius:14px;padding:12px 13px;outline:none}textarea{min-height:95px;resize:vertical}input:focus,textarea:focus{border-color:var(--a)}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.checks{display:flex;gap:18px;margin:14px 0}.checks label{display:flex;gap:7px;align-items:center;color:#d8dbe4}.checks input{width:auto}button{border:0;border-radius:14px;padding:12px 16px;font-weight:700;color:white;background:linear-gradient(135deg,var(--a),var(--b));cursor:pointer}button.secondary{background:#1d2330;color:#dce0ea;border:1px solid #31394a}button:disabled{opacity:.45;cursor:not-allowed}.status{margin-top:12px;padding:12px;border-radius:14px;background:#0b0e14;color:var(--muted);white-space:pre-wrap}.status.good{color:var(--good)}.status.bad{color:var(--bad)}.app{padding:13px;border:1px solid var(--line);border-radius:16px;margin:8px 0;background:#0d1017;cursor:pointer}.app:hover{border-color:#5361c7}.app strong{display:block}.app small{color:var(--muted)}.meter{height:7px;background:#202634;border-radius:99px;overflow:hidden;margin-top:8px}.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b))}.note{font-size:12px;color:var(--muted);line-height:1.55}.keybar{display:flex;gap:9px}.keybar input{flex:1}.pill{display:inline-block;padding:5px 9px;background:#202638;border-radius:99px;color:#bfc6ff;font-size:11px}.spacer{height:14px}
+</style>
+</head>
+<body>
+<header><h1>APK App Store Admin</h1><p>Publish APKs, release updates and manage your private catalog.</p></header>
+<main>
+<section class="card">
+  <h2>Publish app / update</h2>
+  <div class="keybar"><input id="adminKey" type="password" placeholder="ADMIN_KEY secret" autocomplete="off"><button class="secondary" id="saveKey">Use key</button></div>
+  <div class="spacer"></div>
+  <div class="grid">
+    <div><label>App name</label><input id="name" placeholder="Media Pocket"></div>
+    <div><label>Package name</label><input id="package" placeholder="com.example.app"></div>
+    <div><label>Slug</label><input id="slug" placeholder="media-pocket"></div>
+    <div><label>Category</label><input id="category" value="Apps"></div>
+  </div>
+  <div class="spacer"></div>
+  <label>Short description</label><input id="short" maxlength="240" placeholder="One-line description">
+  <div class="spacer"></div>
+  <label>Full description</label><textarea id="description" placeholder="What the app does..."></textarea>
+  <div class="checks"><label><input id="featured" type="checkbox"> Featured</label><label><input id="published" type="checkbox" checked> Published</label></div>
+  <div class="grid">
+    <div><label>App icon (PNG/JPG/WebP)</label><input id="icon" type="file" accept="image/*"></div>
+    <div><label>Screenshots</label><input id="screenshots" type="file" accept="image/*" multiple></div>
+  </div>
+  <hr style="border:0;border-top:1px solid var(--line);margin:22px 0">
+  <h2>Release</h2>
+  <div class="grid">
+    <div><label>Version name</label><input id="versionName" placeholder="1.2.0"></div>
+    <div><label>Version code</label><input id="versionCode" type="number" min="1" placeholder="12"></div>
+    <div><label>Minimum Android API</label><input id="minSdk" type="number" min="21" value="29"></div>
+    <div><label>APK file</label><input id="apk" type="file" accept=".apk,application/vnd.android.package-archive"></div>
+  </div>
+  <div class="spacer"></div>
+  <label>What's new</label><textarea id="changelog" placeholder="Bug fixes, new features..."></textarea>
+  <div class="spacer"></div>
+  <button id="publishBtn" style="width:100%">Publish to APK App Store</button>
+  <div class="meter"><i id="bar"></i></div>
+  <div id="status" class="status">Ready. Your admin key stays in this browser tab only.</div>
+</section>
+<aside class="card">
+  <div class="row"><div><h2 style="margin:0">Published apps</h2><div class="note">Tap an app to load its metadata for a new release.</div></div><button class="secondary" id="refresh">Refresh</button></div>
+  <div id="apps" style="margin-top:14px"></div>
+  <div class="spacer"></div>
+  <div class="note"><span class="pill">Update rule</span><p>For Android to update an installed app, package name and signing certificate must stay the same, and the new version code must be higher.</p><p>Large APKs use multipart R2 uploads in chunks so they are not limited to one giant Worker request.</p></div>
+</aside>
+</main>
+<script>
+const $=id=>document.getElementById(id); let catalog=[];
+const key=()=>sessionStorage.getItem('adminKey')||$('adminKey').value.trim();
+$('adminKey').value=sessionStorage.getItem('adminKey')||'';
+$('saveKey').onclick=()=>{sessionStorage.setItem('adminKey',$('adminKey').value.trim());setStatus('Admin key saved for this tab.','good');loadApps()};
+const setStatus=(t,c='')=>{$('status').className='status '+c;$('status').textContent=t};
+const pct=n=>{$('bar').style.width=Math.max(0,Math.min(100,n))+'%'};
+async function api(path,opts={}){opts.headers={...(opts.headers||{}),'x-admin-key':key()};const r=await fetch(path,opts);let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);return data}
+async function sha256(file){const b=await file.arrayBuffer();const d=await crypto.subtle.digest('SHA-256',b);return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function uploadSmall(file,kind,hash=''){const q=new URLSearchParams({kind,filename:file.name});return api('/api/admin/upload?'+q,{method:'POST',headers:{'content-type':file.type||'application/octet-stream','x-file-size':String(file.size),'x-sha256':hash},body:file})}
+async function uploadLarge(file,kind,hash=''){
+  const start=await api('/api/admin/multipart/start',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind,filename:file.name,content_type:file.type||'application/octet-stream',file_size:file.size,sha256:hash})});
+  const chunk=20*1024*1024, parts=[]; let sent=0, part=1;
+  for(let offset=0;offset<file.size;offset+=chunk){const blob=file.slice(offset,Math.min(file.size,offset+chunk));const q=new URLSearchParams({key:start.key,upload_id:start.upload_id,part_number:String(part)});const res=await api('/api/admin/multipart/part?'+q,{method:'PUT',headers:{'content-type':'application/octet-stream'},body:blob});parts.push({partNumber:res.part_number,etag:res.etag});sent+=blob.size;pct(25+Math.round((sent/file.size)*55));part++}
+  await api('/api/admin/multipart/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key:start.key,upload_id:start.upload_id,parts})});
+  return {key:start.key,url:start.url,sha256:hash,file_size:file.size};
+}
+async function upload(file,kind,hash=''){return file.size>45*1024*1024?uploadLarge(file,kind,hash):uploadSmall(file,kind,hash)}
+async function loadApps(){if(!key())return;try{const d=await api('/api/admin/apps');catalog=d.apps||[];$('apps').innerHTML=catalog.length?catalog.map((a,i)=>`<div class="app" data-i="${i}"><strong>${esc(a.name)}</strong><small>${esc(a.package_name)} · ${esc(a.version_name||'No release')} · ${a.download_count||0} downloads</small></div>`).join(''):'<div class="note">No apps yet.</div>';document.querySelectorAll('.app').forEach(el=>el.onclick=()=>fill(catalog[+el.dataset.i]))}catch(e){setStatus(e.message,'bad')}}
+function fill(a){$('name').value=a.name||'';$('package').value=a.package_name||'';$('slug').value=a.slug||'';$('category').value=a.category||'Apps';$('short').value=a.short_description||'';$('description').value=a.description||'';$('featured').checked=!!a.featured;$('published').checked=a.published!==false;$('versionCode').value=a.version_code?Number(a.version_code)+1:'';$('versionName').value='';$('changelog').value='';window.scrollTo({top:0,behavior:'smooth'})}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('refresh').onclick=loadApps;
+$('publishBtn').onclick=async()=>{const btn=$('publishBtn');btn.disabled=true;pct(2);try{
+  if(!key())throw new Error('Enter ADMIN_KEY first.');
+  const icon=$('icon').files[0];let iconKey='';if(icon){setStatus('Uploading icon...');const u=await upload(icon,'icon');iconKey=u.key;pct(12)}
+  const app=await api('/api/admin/apps',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:$('name').value,package_name:$('package').value,slug:$('slug').value,category:$('category').value,short_description:$('short').value,description:$('description').value,featured:$('featured').checked,published:$('published').checked,...(iconKey?{icon_key:iconKey}:{})})});pct(20);
+  const apk=$('apk').files[0];if(apk){const vc=+$('versionCode').value;if(!vc||!$('versionName').value.trim())throw new Error('Version code and version name are required when uploading an APK.');setStatus('Calculating APK SHA-256...');const hash=await sha256(apk);pct(25);setStatus(`Uploading ${apk.name} (${Math.round(apk.size/1048576)} MB)...`);const up=await upload(apk,'apk',hash);pct(82);await api('/api/admin/releases',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({app_id:app.id,version_code:vc,version_name:$('versionName').value.trim(),min_sdk:+$('minSdk').value||29,apk_key:up.key,file_size:apk.size,sha256:hash,changelog:$('changelog').value,published:true})});pct(90)}
+  const shots=[...$('screenshots').files];for(let i=0;i<shots.length;i++){setStatus(`Uploading screenshot ${i+1}/${shots.length}...`);const up=await upload(shots[i],'screenshot');await api('/api/admin/screenshots',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({app_id:app.id,file_key:up.key,sort_order:i})})}
+  pct(100);setStatus('Published successfully. Android clients will see the new version on their next update check.','good');await loadApps();
+}catch(e){setStatus(e.message||String(e),'bad');pct(0)}finally{btn.disabled=false}};
+loadApps();
+</script>
+</body>
+</html>
