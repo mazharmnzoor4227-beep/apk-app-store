@@ -13,6 +13,10 @@ function isAdmin(request, env) {
   return direct === env.ADMIN_KEY || bearer === env.ADMIN_KEY;
 }
 
+function customerKey(request) {
+  return String(request.headers.get("x-customer-key") || "").trim().slice(0, 120);
+}
+
 function publicFileUrl(request, key) {
   if (!key) return "";
   return `${new URL(request.url).origin}/files/${encodeURIComponent(key).replaceAll("%2F", "/")}`;
@@ -26,8 +30,20 @@ function safeName(value) {
   return String(value || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
 }
 
+function normalizePaymentType(value) {
+  const v = safeSlug(value || "other");
+  return ["easypaisa", "jazzcash", "nayapay", "bank", "raast", "other"].includes(v) ? v : "other";
+}
+
+async function latestPurchase(env, key, appId) {
+  if (!key) return null;
+  return env.DB.prepare(`SELECT id,status,amount_pkr,created_at FROM purchases WHERE customer_key=? AND app_id=? ORDER BY CASE status WHEN 'approved' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, id DESC LIMIT 1`)
+    .bind(key, appId).first();
+}
+
 async function listApps(request, env, includeUnpublished = false) {
   const where = includeUnpublished ? "" : "WHERE a.published = 1";
+  const key = customerKey(request);
   const { results = [] } = await env.DB.prepare(`
     SELECT a.*,
       r.id AS release_id, r.version_code, r.version_name, r.min_sdk, r.apk_key,
@@ -46,6 +62,9 @@ async function listApps(request, env, includeUnpublished = false) {
   const out = [];
   for (const row of results) {
     const shots = await env.DB.prepare("SELECT file_key FROM screenshots WHERE app_id = ? ORDER BY sort_order, id").bind(row.id).all();
+    const isPaid = !!row.is_paid && Number(row.price_pkr || 0) > 0;
+    const purchase = isPaid && !includeUnpublished ? await latestPurchase(env, key, row.id) : null;
+    const owned = !isPaid || purchase?.status === "approved";
     out.push({
       id: row.id,
       slug: row.slug,
@@ -57,6 +76,10 @@ async function listApps(request, env, includeUnpublished = false) {
       icon_url: publicFileUrl(request, row.icon_key),
       featured: !!row.featured,
       published: !!row.published,
+      is_paid: isPaid,
+      price_pkr: isPaid ? Number(row.price_pkr || 0) : 0,
+      owned,
+      purchase_status: purchase?.status || (isPaid ? "none" : "free"),
       version_code: Number(row.version_code || 0),
       version_name: row.version_name || "",
       min_sdk: Number(row.min_sdk || 29),
@@ -64,7 +87,7 @@ async function listApps(request, env, includeUnpublished = false) {
       sha256: row.sha256 || "",
       changelog: row.changelog || "",
       published_at: row.published_at || "",
-      download_url: row.release_id ? `${new URL(request.url).origin}/api/apps/${encodeURIComponent(row.slug)}/download` : "",
+      download_url: row.release_id && (owned || includeUnpublished) ? `${new URL(request.url).origin}/api/apps/${encodeURIComponent(row.slug)}/download` : "",
       screenshots: (shots.results || []).map(s => publicFileUrl(request, s.file_key)),
       download_count: Number(row.download_count || 0)
     });
@@ -87,23 +110,28 @@ async function handleAdminApp(request, env) {
   if (!packageName || !name || !slug) return bad("package_name, name and slug are required");
 
   const existing = await env.DB.prepare("SELECT id, icon_key FROM apps WHERE package_name = ? OR slug = ? LIMIT 1").bind(packageName, slug).first();
+  const isPaid = body.is_paid ? 1 : 0;
+  const price = isPaid ? Math.max(1, Math.round(Number(body.price_pkr || 0))) : 0;
+  if (isPaid && !price) return bad("Paid apps require a price");
   const values = {
     short_description: String(body.short_description || "").slice(0, 240),
     description: String(body.description || ""),
     category: String(body.category || "Apps").slice(0, 80),
     icon_key: String(body.icon_key || existing?.icon_key || ""),
     featured: body.featured ? 1 : 0,
-    published: body.published === false ? 0 : 1
+    published: body.published === false ? 0 : 1,
+    is_paid: isPaid,
+    price_pkr: price
   };
 
   if (existing) {
-    await env.DB.prepare(`UPDATE apps SET slug=?, package_name=?, name=?, short_description=?, description=?, category=?, icon_key=?, featured=?, published=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-      .bind(slug, packageName, name, values.short_description, values.description, values.category, values.icon_key, values.featured, values.published, existing.id).run();
+    await env.DB.prepare(`UPDATE apps SET slug=?, package_name=?, name=?, short_description=?, description=?, category=?, icon_key=?, featured=?, published=?, is_paid=?, price_pkr=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+      .bind(slug, packageName, name, values.short_description, values.description, values.category, values.icon_key, values.featured, values.published, values.is_paid, values.price_pkr, existing.id).run();
     return json({ ok: true, id: existing.id, slug });
   }
 
-  const result = await env.DB.prepare(`INSERT INTO apps(slug, package_name, name, short_description, description, category, icon_key, featured, published) VALUES(?,?,?,?,?,?,?,?,?)`)
-    .bind(slug, packageName, name, values.short_description, values.description, values.category, values.icon_key, values.featured, values.published).run();
+  const result = await env.DB.prepare(`INSERT INTO apps(slug, package_name, name, short_description, description, category, icon_key, featured, published, is_paid, price_pkr) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(slug, packageName, name, values.short_description, values.description, values.category, values.icon_key, values.featured, values.published, values.is_paid, values.price_pkr).run();
   return json({ ok: true, id: result.meta.last_row_id, slug }, 201);
 }
 
@@ -123,6 +151,42 @@ async function handleUpload(request, env) {
     customMetadata: { sha256, fileSize: String(fileSize) }
   });
   return json({ ok: true, key, url: publicFileUrl(request, key), sha256, file_size: fileSize }, 201);
+}
+
+async function handleMultipartStart(request, env) {
+  if (!isAdmin(request, env)) return bad("Unauthorized", 401);
+  const body = await request.json().catch(() => null);
+  if (!body) return bad("Invalid JSON");
+  const kind = safeSlug(body.kind || "file");
+  if (!["apk", "icon", "screenshot"].includes(kind)) return bad("Invalid upload kind");
+  const filename = safeName(body.filename || `${kind}.bin`);
+  const key = `${kind}/${crypto.randomUUID()}-${filename}`;
+  const upload = await env.FILES.createMultipartUpload(key, {
+    httpMetadata: { contentType: String(body.content_type || "application/octet-stream") },
+    customMetadata: { sha256: String(body.sha256 || ""), fileSize: String(Number(body.file_size || 0)) }
+  });
+  return json({ ok: true, key, upload_id: upload.uploadId, url: publicFileUrl(request, key) }, 201);
+}
+
+async function handleMultipartPart(request, env) {
+  if (!isAdmin(request, env)) return bad("Unauthorized", 401);
+  const url = new URL(request.url);
+  const key = String(url.searchParams.get("key") || "");
+  const uploadId = String(url.searchParams.get("upload_id") || "");
+  const partNumber = Number(url.searchParams.get("part_number") || 0);
+  if (!key || !uploadId || partNumber < 1 || !request.body) return bad("Invalid multipart part");
+  const upload = env.FILES.resumeMultipartUpload(key, uploadId);
+  const part = await upload.uploadPart(partNumber, request.body);
+  return json({ ok: true, part_number: part.partNumber, etag: part.etag });
+}
+
+async function handleMultipartComplete(request, env) {
+  if (!isAdmin(request, env)) return bad("Unauthorized", 401);
+  const body = await request.json().catch(() => null);
+  if (!body?.key || !body?.upload_id || !Array.isArray(body.parts)) return bad("Invalid multipart completion");
+  const upload = env.FILES.resumeMultipartUpload(String(body.key), String(body.upload_id));
+  await upload.complete(body.parts.map(p => ({ partNumber: Number(p.partNumber), etag: String(p.etag) })));
+  return json({ ok: true, key: body.key });
 }
 
 async function handleRelease(request, env) {
@@ -160,6 +224,79 @@ async function handleScreenshot(request, env) {
   return json({ ok: true }, 201);
 }
 
+async function publicPaymentMethods(env) {
+  const { results = [] } = await env.DB.prepare("SELECT id,type,label,account_title,account_value,instructions FROM payment_methods WHERE enabled=1 ORDER BY sort_order,id").all();
+  return results;
+}
+
+async function handlePurchase(request, env) {
+  const key = customerKey(request);
+  if (key.length < 8) return bad("Customer identity missing", 401);
+  const body = await request.json().catch(() => null);
+  if (!body) return bad("Invalid JSON");
+  const slug = safeSlug(body.slug || "");
+  const name = String(body.customer_name || "").trim().slice(0, 100);
+  const phone = String(body.phone || "").trim().slice(0, 40);
+  const methodId = Number(body.payment_method_id || 0);
+  const tx = String(body.transaction_reference || "").trim().slice(0, 120);
+  if (!slug || !name || !phone || !methodId || !tx) return bad("Name, phone, payment method and transaction reference are required");
+
+  const app = await env.DB.prepare("SELECT id,is_paid,price_pkr FROM apps WHERE slug=? AND published=1").bind(slug).first();
+  if (!app) return bad("App not found", 404);
+  if (!app.is_paid || Number(app.price_pkr || 0) <= 0) return bad("This app is free", 409);
+  const method = await env.DB.prepare("SELECT id,label FROM payment_methods WHERE id=? AND enabled=1").bind(methodId).first();
+  if (!method) return bad("Payment method not available", 404);
+
+  const approved = await env.DB.prepare("SELECT id,status FROM purchases WHERE app_id=? AND customer_key=? AND status='approved' ORDER BY id DESC LIMIT 1").bind(app.id, key).first();
+  if (approved) return json({ ok: true, purchase_id: approved.id, status: "approved" });
+  const pending = await env.DB.prepare("SELECT id,status FROM purchases WHERE app_id=? AND customer_key=? AND status='pending' ORDER BY id DESC LIMIT 1").bind(app.id, key).first();
+  if (pending) return json({ ok: true, purchase_id: pending.id, status: "pending" });
+
+  const result = await env.DB.prepare(`INSERT INTO purchases(app_id,customer_key,customer_name,phone,payment_method_id,payment_method_label,transaction_reference,amount_pkr,status) VALUES(?,?,?,?,?,?,?,?, 'pending')`)
+    .bind(app.id, key, name, phone, method.id, method.label, tx, Number(app.price_pkr)).run();
+  return json({ ok: true, purchase_id: result.meta.last_row_id, status: "pending" }, 201);
+}
+
+async function handleAdminPaymentMethod(request, env) {
+  if (!isAdmin(request, env)) return bad("Unauthorized", 401);
+  const body = await request.json().catch(() => null);
+  if (!body) return bad("Invalid JSON");
+  const id = Number(body.id || 0);
+  const type = normalizePaymentType(body.type);
+  const label = String(body.label || "").trim().slice(0, 80);
+  const title = String(body.account_title || "").trim().slice(0, 120);
+  const value = String(body.account_value || "").trim().slice(0, 180);
+  const instructions = String(body.instructions || "").trim().slice(0, 500);
+  const enabled = body.enabled === false ? 0 : 1;
+  const sort = Number(body.sort_order || 0);
+  if (!label || !value) return bad("Label and account/number are required");
+  if (id) {
+    await env.DB.prepare("UPDATE payment_methods SET type=?,label=?,account_title=?,account_value=?,instructions=?,enabled=?,sort_order=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+      .bind(type,label,title,value,instructions,enabled,sort,id).run();
+    return json({ ok:true,id });
+  }
+  const result = await env.DB.prepare("INSERT INTO payment_methods(type,label,account_title,account_value,instructions,enabled,sort_order) VALUES(?,?,?,?,?,?,?)")
+    .bind(type,label,title,value,instructions,enabled,sort).run();
+  return json({ ok:true,id:result.meta.last_row_id },201);
+}
+
+async function adminPurchases(env) {
+  const { results = [] } = await env.DB.prepare(`SELECT p.*,a.name AS app_name,a.slug AS app_slug FROM purchases p JOIN apps a ON a.id=p.app_id ORDER BY CASE p.status WHEN 'pending' THEN 0 ELSE 1 END,p.id DESC LIMIT 500`).all();
+  return results;
+}
+
+async function handleAdminPurchaseStatus(request, env, id) {
+  if (!isAdmin(request, env)) return bad("Unauthorized", 401);
+  const body = await request.json().catch(() => null);
+  const status = String(body?.status || "");
+  if (!["pending","approved","rejected","refunded"].includes(status)) return bad("Invalid status");
+  const note = String(body?.admin_note || "").slice(0,500);
+  const result = await env.DB.prepare("UPDATE purchases SET status=?,admin_note=?,updated_at=CURRENT_TIMESTAMP,approved_at=CASE WHEN ?='approved' THEN CURRENT_TIMESTAMP ELSE approved_at END WHERE id=?")
+    .bind(status,note,status,Number(id)).run();
+  if (!result.meta.changes) return bad("Purchase not found",404);
+  return json({ok:true});
+}
+
 async function serveR2(request, env, key, download = false) {
   const object = await env.FILES.get(key);
   if (!object) return new Response("Not found", { status: 404 });
@@ -177,12 +314,14 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS", "access-control-allow-headers": "content-type,authorization,x-admin-key,x-sha256,x-file-size" } });
+      return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS", "access-control-allow-headers": "content-type,authorization,x-admin-key,x-sha256,x-file-size,x-customer-key" } });
     }
 
     try {
       if (path === "/api/health" && request.method === "GET") return json({ ok: true, service: "APK App Store" });
       if (path === "/api/apps" && request.method === "GET") return json({ apps: await listApps(request, env, false) });
+      if (path === "/api/payment-methods" && request.method === "GET") return json({ methods: await publicPaymentMethods(env) });
+      if (path === "/api/purchases" && request.method === "POST") return handlePurchase(request, env);
 
       const appMatch = path.match(/^\/api\/apps\/([^/]+)$/);
       if (appMatch && request.method === "GET") {
@@ -193,13 +332,23 @@ export default {
       const downloadMatch = path.match(/^\/api\/apps\/([^/]+)\/download$/);
       if (downloadMatch && request.method === "GET") {
         const slug = decodeURIComponent(downloadMatch[1]);
-        const row = await env.DB.prepare(`SELECT a.id AS app_id, r.id AS release_id, r.apk_key FROM apps a JOIN releases r ON r.id=(SELECT r2.id FROM releases r2 WHERE r2.app_id=a.id AND r2.published=1 ORDER BY r2.version_code DESC LIMIT 1) WHERE a.slug=? AND a.published=1`).bind(slug).first();
+        const row = await env.DB.prepare(`SELECT a.id AS app_id,a.is_paid,a.price_pkr,r.id AS release_id,r.apk_key FROM apps a JOIN releases r ON r.id=(SELECT r2.id FROM releases r2 WHERE r2.app_id=a.id AND r2.published=1 ORDER BY r2.version_code DESC LIMIT 1) WHERE a.slug=? AND a.published=1`).bind(slug).first();
         if (!row) return bad("Release not found", 404);
+        if (row.is_paid && Number(row.price_pkr || 0) > 0) {
+          const key = customerKey(request);
+          if (!key) return bad("Purchase required", 402);
+          const owned = await env.DB.prepare("SELECT id FROM purchases WHERE app_id=? AND customer_key=? AND status='approved' ORDER BY id DESC LIMIT 1").bind(row.app_id,key).first();
+          if (!owned) return bad("Purchase required", 402);
+        }
         await env.DB.prepare("INSERT INTO downloads(app_id, release_id) VALUES(?,?)").bind(row.app_id, row.release_id).run();
         return serveR2(request, env, row.apk_key, true);
       }
 
-      if (path.startsWith("/files/") && request.method === "GET") return serveR2(request, env, decodeURIComponent(path.slice(7)), false);
+      if (path.startsWith("/files/") && request.method === "GET") {
+        const key = decodeURIComponent(path.slice(7));
+        if (key.startsWith("apk/")) return bad("Protected file", 403);
+        return serveR2(request, env, key, false);
+      }
 
       if (path === "/api/admin/apps" && request.method === "GET") {
         if (!isAdmin(request, env)) return bad("Unauthorized", 401);
@@ -207,8 +356,23 @@ export default {
       }
       if (path === "/api/admin/apps" && request.method === "POST") return handleAdminApp(request, env);
       if (path === "/api/admin/upload" && request.method === "POST") return handleUpload(request, env);
+      if (path === "/api/admin/multipart/start" && request.method === "POST") return handleMultipartStart(request, env);
+      if (path === "/api/admin/multipart/part" && request.method === "PUT") return handleMultipartPart(request, env);
+      if (path === "/api/admin/multipart/complete" && request.method === "POST") return handleMultipartComplete(request, env);
       if (path === "/api/admin/releases" && request.method === "POST") return handleRelease(request, env);
       if (path === "/api/admin/screenshots" && request.method === "POST") return handleScreenshot(request, env);
+      if (path === "/api/admin/payment-methods" && request.method === "GET") {
+        if (!isAdmin(request, env)) return bad("Unauthorized",401);
+        const {results=[]}=await env.DB.prepare("SELECT * FROM payment_methods ORDER BY sort_order,id").all();
+        return json({methods:results});
+      }
+      if (path === "/api/admin/payment-methods" && request.method === "POST") return handleAdminPaymentMethod(request,env);
+      if (path === "/api/admin/purchases" && request.method === "GET") {
+        if (!isAdmin(request, env)) return bad("Unauthorized",401);
+        return json({purchases:await adminPurchases(env)});
+      }
+      const purchaseStatusMatch = path.match(/^\/api\/admin\/purchases\/(\d+)$/);
+      if (purchaseStatusMatch && request.method === "PUT") return handleAdminPurchaseStatus(request,env,purchaseStatusMatch[1]);
 
       if (path === "/admin" || path === "/admin/") {
         const adminUrl = new URL("/admin.html", url.origin);
