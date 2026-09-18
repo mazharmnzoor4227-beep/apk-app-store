@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "apk-app-store",
-  "main": "worker/index.js",
+  "main": "worker/app.js",
   "compatibility_date": "2025-08-01",
   "workers_dev": true,
   "assets": {
