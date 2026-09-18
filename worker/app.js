@@ -68,6 +68,11 @@ export default {
   async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname;
     try {
+      if ((path === "/admin" || path === "/admin/") && (request.method === "GET" || request.method === "HEAD")) {
+        const url = new URL(request.url);
+        url.pathname = "/admin-v2.html";
+        return env.ASSETS.fetch(new Request(url.toString(), request));
+      }
       if (path === "/api/admin/multipart/start" && request.method === "POST") return startMultipart(request, env);
       if (path === "/api/admin/multipart/part" && request.method === "PUT") return uploadPart(request, env);
       if (path === "/api/admin/multipart/complete" && request.method === "POST") return completeMultipart(request, env);
