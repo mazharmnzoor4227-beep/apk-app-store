@@ -21,13 +21,70 @@ object StoreApi {
 
     private fun base(context: Context): String = StoreConfig.backendUrl(context)
 
-    private fun request(context: Context, url: String): Request.Builder = Request.Builder()
-        .url(url)
-        .header("x-customer-key", StoreConfig.customerKey(context))
+    private fun request(context: Context, url: String): Request.Builder {
+        val builder = Request.Builder()
+            .url(url)
+            .header("x-customer-key", StoreConfig.customerKey(context))
+        val token = StoreConfig.authToken(context)
+        if (token.isNotBlank()) builder.header("Authorization", "Bearer $token")
+        return builder
+    }
+
+    private fun parseAccount(o: JSONObject): AccountUser = AccountUser(
+        id = o.optLong("id"),
+        name = o.optString("name"),
+        email = o.optString("email")
+    )
+
+    suspend fun register(context: Context, name: String, email: String, password: String): AuthSession = withContext(Dispatchers.IO) {
+        authRequest(context, "/api/auth/register", JSONObject()
+            .put("name", name.trim())
+            .put("email", email.trim())
+            .put("password", password))
+    }
+
+    suspend fun login(context: Context, email: String, password: String): AuthSession = withContext(Dispatchers.IO) {
+        authRequest(context, "/api/auth/login", JSONObject()
+            .put("email", email.trim())
+            .put("password", password))
+    }
+
+    private fun authRequest(context: Context, path: String, payload: JSONObject): AuthSession {
+        val req = Request.Builder()
+            .url(base(context) + path)
+            .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+        client.newCall(req).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            val root = runCatching { JSONObject(text) }.getOrElse { JSONObject() }
+            if (!response.isSuccessful) error(root.optString("error", "Account request failed"))
+            val token = root.optString("token")
+            val user = root.optJSONObject("user") ?: error("Invalid account response")
+            if (token.isBlank()) error("Invalid account session")
+            AuthSession(token, parseAccount(user))
+        }
+    }
+
+    suspend fun me(context: Context): AccountUser = withContext(Dispatchers.IO) {
+        val req = request(context, base(context) + "/api/auth/me").get().build()
+        client.newCall(req).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            val root = runCatching { JSONObject(text) }.getOrElse { JSONObject() }
+            if (!response.isSuccessful) error(root.optString("error", "Account session expired"))
+            parseAccount(root.optJSONObject("user") ?: error("Invalid account response"))
+        }
+    }
+
+    suspend fun logout(context: Context) = withContext(Dispatchers.IO) {
+        val req = request(context, base(context) + "/api/auth/logout")
+            .post("{}".toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+        runCatching { client.newCall(req).execute().close() }
+        StoreConfig.clearSession(context)
+    }
 
     suspend fun apps(context: Context): List<StoreApp> = withContext(Dispatchers.IO) {
         val base = base(context)
-        if (base.isBlank()) return@withContext emptyList()
         val req = request(context, "$base/api/apps").get().build()
         client.newCall(req).execute().use { response ->
             if (!response.isSuccessful) error("Store API ${response.code}")
@@ -41,7 +98,6 @@ object StoreApi {
 
     suspend fun paymentMethods(context: Context): List<PaymentMethod> = withContext(Dispatchers.IO) {
         val base = base(context)
-        if (base.isBlank()) return@withContext emptyList()
         val req = request(context, "$base/api/payment-methods").get().build()
         client.newCall(req).execute().use { response ->
             if (!response.isSuccessful) error("Payment API ${response.code}")
@@ -72,7 +128,6 @@ object StoreApi {
         transactionReference: String
     ): String = withContext(Dispatchers.IO) {
         val base = base(context)
-        if (base.isBlank()) error("Store service is unavailable")
         val payload = JSONObject()
             .put("slug", app.slug)
             .put("customer_name", name.trim())
