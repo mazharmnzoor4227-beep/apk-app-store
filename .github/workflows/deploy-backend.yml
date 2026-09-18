@@ -1,6 +1,14 @@
 name: Deploy APK App Store Backend
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - 'migrations/**'
+      - 'public/**'
+      - 'wrangler.jsonc'
+      - '.github/workflows/deploy-backend.yml'
 permissions:
   contents: read
 jobs:
