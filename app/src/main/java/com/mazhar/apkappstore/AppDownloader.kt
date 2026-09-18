@@ -10,8 +10,18 @@ import okhttp3.Request
 import java.io.File
 import java.security.MessageDigest
 
+private class OpenHandledException : Exception("")
+
 object AppDownloader {
     suspend fun download(context: Context, app: StoreApp, onProgress: (Int) -> Unit = {}): File = withContext(Dispatchers.IO) {
+        val state = StoreApi.installedState(context, app)
+        if (state.installed && !state.updateAvailable) {
+            withContext(Dispatchers.Main) {
+                context.packageManager.getLaunchIntentForPackage(app.packageName)?.let { context.startActivity(it) }
+            }
+            throw OpenHandledException()
+        }
+
         require(app.downloadUrl.startsWith("https://") || app.downloadUrl.startsWith("http://")) { "Invalid download URL" }
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(dir, "${app.packageName}-${app.versionCode}.apk")
