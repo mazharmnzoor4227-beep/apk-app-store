@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "apk-app-store-db",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "31fb63b4-e132-4c53-a3ab-c7dc5c8c0776",
       "migrations_dir": "migrations"
     }
   ],
