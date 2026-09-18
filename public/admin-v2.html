@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>APK App Store Admin</title>
+<script src="https://unpkg.com/app-info-parser@1.1.6/dist/app-info-parser.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#080a0f;--panel:#11141c;--text:#f5f7fb;--muted:#a5acba;--line:#293041;--a:#7180ff;--b:#9b6cff;--good:#77e09a;--bad:#ff8585}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#1b2048 0,transparent 32%),var(--bg);font:14px system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text)}header{padding:24px 18px;border-bottom:1px solid var(--line);background:#080a0fe8;backdrop-filter:blur(18px);position:sticky;top:0;z-index:5}h1{margin:0;font-size:27px}header p{margin:5px 0 0;color:var(--muted)}main{max-width:760px;margin:auto;padding:16px;display:grid;gap:16px}.card{background:linear-gradient(180deg,#121620,#0e1118);border:1px solid var(--line);border-radius:24px;padding:18px;box-shadow:0 16px 50px #0005}.card h2{margin:0 0 14px;font-size:20px}.keybar{display:flex;gap:9px}.keybar input{flex:1}input{width:100%;border:1px solid #303747;background:#0b0e14;color:#fff;border-radius:14px;padding:13px;outline:none}button,a.btn{border:0;border-radius:14px;padding:12px 16px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--a),var(--b));cursor:pointer;text-decoration:none;display:inline-block}button.secondary,a.secondary{background:#1d2330;color:#dce0ea;border:1px solid #31394a}button:disabled{opacity:.45}.drop{border:1px dashed #4a5570;border-radius:20px;padding:22px;text-align:center;background:#0b0e14}.drop input{margin-top:12px}.note{font-size:12px;color:var(--muted);line-height:1.5}.status{margin-top:12px;padding:12px;border-radius:14px;background:#0b0e14;color:var(--muted);white-space:pre-wrap}.status.good{color:var(--good)}.status.bad{color:var(--bad)}.meta{display:none;margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:16px;background:#0d1017}.meta div{margin:5px 0;color:var(--muted)}.meta b{color:var(--text)}.meter{height:8px;background:#202634;border-radius:99px;overflow:hidden;margin-top:10px}.meter i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--a),var(--b))}.app{padding:12px;border:1px solid var(--line);border-radius:15px;margin:8px 0;background:#0d1017}.app strong{display:block}.app small{color:var(--muted)}.pill{display:inline-block;padding:4px 8px;background:#202638;border-radius:99px;color:#bfc6ff;font-size:11px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.links{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}@media(max-width:600px){.keybar{flex-direction:column}}
+</style>
+</head>
+<body>
+<header><h1>APK App Store Admin</h1><p>Select an APK and publish it directly.</p></header>
+<main>
+<section class="card">
+<h2>Admin access</h2>
+<div class="keybar"><input id="adminKey" type="password" placeholder="ADMIN_KEY"><button id="useKey" class="secondary">Use key</button></div>
+<div id="auth" class="status">Enter the admin key once for this tab.</div>
+</section>
+<section class="card">
+<h2>Upload APK</h2>
+<div class="drop"><b>Choose APK file</b><div class="note">App name, package name, version and icon are read automatically.</div><input id="apk" type="file" accept=".apk,application/vnd.android.package-archive"></div>
+<div id="meta" class="meta"></div>
+<div style="height:12px"></div>
+<button id="publish" style="width:100%" disabled>Upload & Publish</button>
+<div class="meter"><i id="bar"></i></div>
+<div id="status" class="status">Choose an APK to start.</div>
+</section>
+<section class="card">
+<div class="row"><div><h2 style="margin:0">Published apps</h2><div class="note">New uploads and updates appear here.</div></div><button id="refresh" class="secondary">Refresh</button></div>
+<div id="apps"><div class="note">Connect with the admin key first.</div></div>
+<div class="links"><a class="btn" href="/payments.html">Payments & approvals</a><a class="btn secondary" href="/admin.html">Advanced details</a></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);let catalog=[],info=null;
+const key=()=>sessionStorage.getItem('adminKey')||$('adminKey').value.trim();$('adminKey').value=sessionStorage.getItem('adminKey')||'';
+const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const slug=s=>String(s||'').toLowerCase().trim().replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
+function box(id,t,c=''){$(id).className='status '+c;$(id).textContent=t}function pct(n){$('bar').style.width=Math.max(0,Math.min(100,n))+'%'}
+async function api(path,opts={}){opts.headers={...(opts.headers||{}),'x-admin-key':key()};const r=await fetch(path,opts);let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||`HTTP ${r.status}`);return d}
+async function list(){if(!key())throw new Error('Enter ADMIN_KEY first.');const d=await api('/api/admin/apps');catalog=d.apps||[];$('apps').innerHTML=catalog.length?catalog.map(a=>`<div class="app"><strong>${esc(a.name)} ${a.is_paid?`<span class="pill">PKR ${a.price_pkr}</span>`:`<span class="pill">FREE</span>`}</strong><small>${esc(a.package_name)} · ${esc(a.version_name||'No release')} · ${a.download_count||0} downloads</small></div>`).join(''):'<div class="note">No apps yet. Upload your first APK above.</div>';return catalog}
+$('useKey').onclick=async()=>{const v=$('adminKey').value.trim();if(!v){box('auth','Enter ADMIN_KEY first.','bad');return}sessionStorage.setItem('adminKey',v);box('auth','Checking key...');try{await list();box('auth','Admin key accepted. Ready.','good')}catch(e){sessionStorage.removeItem('adminKey');box('auth',e.message,'bad')}};
+$('refresh').onclick=async()=>{try{await list();box('auth','Connected.','good')}catch(e){box('auth',e.message,'bad')}};
+function pickLabel(v){if(typeof v==='string'&&v&&!v.startsWith('resourceId:'))return v;if(Array.isArray(v)){for(const x of v){const r=pickLabel(x);if(r)return r}}if(v&&typeof v==='object'){for(const x of Object.values(v)){const r=pickLabel(x);if(r)return r}}return ''}
+function fileNameName(f){return f.replace(/\.apk$/i,'').replace(/[-_.]+/g,' ').replace(/\b(v?\d+(?:\.\d+)+|release|debug|signed|unsigned)\b/ig,'').replace(/\s+/g,' ').trim()||'Android App'}
+$('apk').onchange=async()=>{const f=$('apk').files[0];info=null;$('publish').disabled=true;$('meta').style.display='none';pct(0);if(!f)return;box('status','Reading APK details...');try{if(!window.AppInfoParser)throw new Error('APK parser did not load. Check internet and reload.');const r=await new window.AppInfoParser(f).parse();const packageName=String(r.package||'').trim(),versionCode=Number(r.versionCode||0),versionName=String(r.versionName||versionCode||'').trim(),minSdk=Number(r.usesSdk?.minSdkVersion||29),appName=pickLabel(r.application?.label)||fileNameName(f.name);if(!packageName||!versionCode)throw new Error('Could not read package/version from this APK.');info={packageName,versionCode,versionName,minSdk,appName,icon:r.icon||''};const existing=catalog.find(a=>a.package_name===packageName);if(existing)info.appName=existing.name||info.appName;$('meta').innerHTML=`<div><b>App:</b> ${esc(info.appName)}</div><div><b>Package:</b> ${esc(packageName)}</div><div><b>Version:</b> ${esc(versionName)} (${versionCode})</div><div><b>Minimum Android:</b> API ${minSdk}</div>`;$('meta').style.display='block';$('publish').disabled=false;box('status',existing?'Update detected. Ready to upload.':'New app detected. Ready to upload.','good')}catch(e){box('status',e.message||String(e),'bad')}};
+async function sha(file){const b=await file.arrayBuffer(),d=await crypto.subtle.digest('SHA-256',b);return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function upSmall(file,kind,hash=''){const q=new URLSearchParams({kind,filename:file.name});return api('/api/admin/upload?'+q,{method:'POST',headers:{'content-type':file.type||'application/octet-stream','x-file-size':String(file.size),'x-sha256':hash},body:file})}
+async function upLarge(file,kind,hash=''){const s=await api('/api/admin/multipart/start',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind,filename:file.name,content_type:file.type||'application/octet-stream',file_size:file.size,sha256:hash})}),chunk=20*1024*1024,parts=[];let sent=0,n=1;for(let o=0;o<file.size;o+=chunk){const b=file.slice(o,Math.min(file.size,o+chunk)),q=new URLSearchParams({key:s.key,upload_id:s.upload_id,part_number:String(n)}),r=await api('/api/admin/multipart/part?'+q,{method:'PUT',headers:{'content-type':'application/octet-stream'},body:b});parts.push({partNumber:r.part_number,etag:r.etag});sent+=b.size;pct(25+Math.round(sent/file.size*55));n++}await api('/api/admin/multipart/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key:s.key,upload_id:s.upload_id,parts})});return {key:s.key}}
+async function upload(file,kind,hash=''){return file.size>45*1024*1024?upLarge(file,kind,hash):upSmall(file,kind,hash)}
+async function iconFile(data,name){if(!data)return null;try{const b=await (await fetch(data)).blob();return new File([b],slug(name||'app')+'.png',{type:b.type||'image/png'})}catch{return null}}
+$('publish').onclick=async()=>{const f=$('apk').files[0],btn=$('publish');if(!f||!info)return;btn.disabled=true;pct(2);try{if(!key())throw new Error('Use ADMIN_KEY first.');await list();const old=catalog.find(a=>a.package_name===info.packageName);if(old&&info.versionCode<=Number(old.version_code||0))throw new Error(`Version code must be higher than ${old.version_code}.`);let iconKey='';if(!old?.icon_url&&info.icon){box('status','Uploading app icon...');const ic=await iconFile(info.icon,info.appName);if(ic){const iu=await upload(ic,'icon');iconKey=iu.key}}box('status','Calculating APK checksum...');const hash=await sha(f);pct(18);box('status',`Uploading ${f.name}...`);const u=await upload(f,'apk',hash);pct(84);const appName=old?.name||info.appName,appSlug=old?.slug||slug(`${appName}-${info.packageName.split('.').pop()}`);const app=await api('/api/admin/apps',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:appName,package_name:info.packageName,slug:appSlug,category:old?.category||'Apps',short_description:old?.short_description||'',description:old?.description||'',featured:!!old?.featured,published:true,is_paid:!!old?.is_paid,price_pkr:Number(old?.price_pkr||0),...(iconKey?{icon_key:iconKey}:{})})});await api('/api/admin/releases',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({app_id:app.id,version_code:info.versionCode,version_name:info.versionName,min_sdk:info.minSdk,apk_key:u.key,file_size:f.size,sha256:hash,changelog:old?'APK update uploaded.':'First release.',published:true})});pct(100);box('status','APK uploaded and published successfully.','good');await list()}catch(e){pct(0);box('status',e.message||String(e),'bad')}finally{btn.disabled=false}};
+if(key())list().then(()=>box('auth','Admin key loaded for this tab.','good')).catch(e=>box('auth',e.message,'bad'));
+</script>
+</body>
+</html>
