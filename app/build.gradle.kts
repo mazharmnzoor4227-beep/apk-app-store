@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val storeBackendUrl = providers.gradleProperty("STORE_BACKEND_URL").orElse("").get()
+
 android {
     namespace = "com.mazhar.apkappstore"
     compileSdk = 35
@@ -12,15 +14,22 @@ android {
         applicationId = "com.mazhar.apkappstore"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
-        buildConfigField("String", "DEFAULT_BACKEND_URL", "\"\"")
+        buildConfigField("String", "DEFAULT_BACKEND_URL", "\"${storeBackendUrl.replace("\"", "\\\"")}\"")
     }
 
     buildTypes {
+        debug {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
@@ -35,7 +44,12 @@ android {
     }
 
     packaging {
-        resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1")
+        resources.excludes += setOf(
+            "META-INF/AL2.0",
+            "META-INF/LGPL2.1",
+            "META-INF/LICENSE*",
+            "META-INF/NOTICE*"
+        )
     }
 }
 
