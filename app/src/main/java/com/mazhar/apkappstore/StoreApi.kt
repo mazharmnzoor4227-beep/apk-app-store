@@ -54,7 +54,7 @@ object StoreApi {
             .url(base(context) + path)
             .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-        client.newCall(req).execute().use { response ->
+        return client.newCall(req).execute().use { response ->
             val text = response.body?.string().orEmpty()
             val root = runCatching { JSONObject(text) }.getOrElse { JSONObject() }
             if (!response.isSuccessful) error(root.optString("error", "Account request failed"))
