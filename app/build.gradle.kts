@@ -30,8 +30,8 @@ android {
         applicationId = "com.mazhar.apkappstore"
         minSdk = 29
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4.0"
+        versionCode = 6
+        versionName = "1.5.0"
 
         buildConfigField("String", "DEFAULT_BACKEND_URL", "\"${storeBackendUrl.replace("\"", "\\\"")}\"")
     }
