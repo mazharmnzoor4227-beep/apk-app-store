@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,6 +7,18 @@ plugins {
 }
 
 val storeBackendUrl = providers.gradleProperty("STORE_BACKEND_URL").orElse("").get()
+val generatedIconResDir = layout.buildDirectory.dir("generated/iconRes")
+val generateStoreIcon = tasks.register("generateStoreIcon") {
+    val source = layout.projectDirectory.file("icon-art.b64")
+    inputs.file(source)
+    outputs.dir(generatedIconResDir)
+    doLast {
+        val drawableDir = generatedIconResDir.get().asFile.resolve("drawable")
+        drawableDir.mkdirs()
+        val encoded = source.asFile.readText().trim()
+        drawableDir.resolve("app_icon_art.webp").writeBytes(Base64.getDecoder().decode(encoded))
+    }
+}
 
 android {
     namespace = "com.mazhar.apkappstore"
@@ -14,11 +28,13 @@ android {
         applicationId = "com.mazhar.apkappstore"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         buildConfigField("String", "DEFAULT_BACKEND_URL", "\"${storeBackendUrl.replace("\"", "\\\"")}\"")
     }
+
+    sourceSets.getByName("main").res.srcDir(generatedIconResDir)
 
     buildTypes {
         debug {
@@ -51,6 +67,10 @@ android {
             "META-INF/NOTICE*"
         )
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(generateStoreIcon)
 }
 
 dependencies {
