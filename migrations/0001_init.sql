@@ -1,0 +1,53 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS apps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  package_name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  short_description TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT 'Apps',
+  icon_key TEXT NOT NULL DEFAULT '',
+  featured INTEGER NOT NULL DEFAULT 0,
+  published INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS releases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app_id INTEGER NOT NULL,
+  version_code INTEGER NOT NULL,
+  version_name TEXT NOT NULL,
+  min_sdk INTEGER NOT NULL DEFAULT 29,
+  apk_key TEXT NOT NULL,
+  file_size INTEGER NOT NULL DEFAULT 0,
+  sha256 TEXT NOT NULL DEFAULT '',
+  changelog TEXT NOT NULL DEFAULT '',
+  published INTEGER NOT NULL DEFAULT 1,
+  published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(app_id, version_code),
+  FOREIGN KEY(app_id) REFERENCES apps(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS screenshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app_id INTEGER NOT NULL,
+  file_key TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY(app_id) REFERENCES apps(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS downloads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app_id INTEGER NOT NULL,
+  release_id INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(app_id) REFERENCES apps(id) ON DELETE CASCADE,
+  FOREIGN KEY(release_id) REFERENCES releases(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_apps_published ON apps(published, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_releases_app ON releases(app_id, version_code DESC);
+CREATE INDEX IF NOT EXISTS idx_downloads_app ON downloads(app_id, created_at DESC);
