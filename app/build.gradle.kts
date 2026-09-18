@@ -6,7 +6,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val storeBackendUrl = providers.gradleProperty("STORE_BACKEND_URL").orElse("").get()
+val storeBackendUrl = providers.gradleProperty("STORE_BACKEND_URL")
+    .orElse("https://apk-app-store.mazharmnzoor4227.workers.dev")
+    .get()
 val generatedIconResDir = layout.buildDirectory.dir("generated/iconRes")
 val generateStoreIcon = tasks.register("generateStoreIcon") {
     val source = layout.projectDirectory.file("icon-art.b64")
@@ -28,8 +30,8 @@ android {
         applicationId = "com.mazhar.apkappstore"
         minSdk = 29
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3.0"
+        versionCode = 5
+        versionName = "1.4.0"
 
         buildConfigField("String", "DEFAULT_BACKEND_URL", "\"${storeBackendUrl.replace("\"", "\\\"")}\"")
     }
