@@ -1,0 +1,36 @@
+APK APP STORE PRIVACY POLICY
+Effective date: September 19, 2026
+
+APK App Store is a self-hosted Android app marketplace used to discover, download, install, purchase and update APK applications.
+
+INFORMATION WE MAY PROCESS
+Depending on enabled features, the service may process your name, email address, profile image and account identifier; Google account information returned after you choose Google sign-in; app purchase information; selected payment method, transaction/reference ID and payment status; Android/device information; installed package names and version codes needed for update detection; download/update status; and technical logs needed to operate and secure the service.
+
+APK App Store does not ask for or store your Google password, banking PIN, Easypaisa/JazzCash PIN or card PIN.
+
+HOW INFORMATION IS USED
+Information is used to provide sign-in and profile features, restore eligible purchases, show owned apps, verify payment submissions, detect installed versions and available updates, deliver APK files, verify downloads, prevent abuse, provide support and maintain the service.
+
+ANDROID PERMISSIONS
+The app may use Internet access, notifications, permission to request APK installation, installed-app visibility and network-state access. Installed-app visibility is used to compare package names and version codes so the store can detect installed apps and available updates. Android may still require final confirmation before a sideloaded APK is installed or updated.
+
+SERVICE PROVIDERS
+The production service is designed to use Cloudflare for API processing, database storage and file storage. Google identity services may be used when Google sign-in is enabled. Those services operate under their own terms and privacy policies.
+
+SHARING
+APK App Store does not sell personal information. Information may be shared only with service providers required to operate the app, when required by law, or when reasonably necessary to protect users and the service.
+
+RETENTION AND DELETION
+Account and purchase records may be retained while an account is active and as reasonably necessary for security, support, payment records and legal obligations. When account services go live, users will be provided a way to request account or data deletion through the support/account flow.
+
+SECURITY
+The service is designed to use HTTPS, protected authentication/session tokens, role-based admin access, private backend secrets and SHA-256 APK verification. No system can guarantee absolute security.
+
+CHILDREN
+APK App Store is not intended for children under 13.
+
+CHANGES
+This policy may be updated when features, providers or legal requirements change. The effective date will be updated when material changes are made.
+
+CONTACT
+Before public launch, the official support/contact method will be published inside APK App Store and on its official distribution page.
