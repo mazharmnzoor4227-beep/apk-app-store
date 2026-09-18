@@ -203,7 +203,24 @@ private fun HomeScreen(
     val filtered = apps.filter { query.isBlank() || it.name.contains(query, true) || it.category.contains(query, true) }
     val featured = apps.firstOrNull { it.featured }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { Header("APK App Store", "Discover, install and update apps in one place.") }
+        item {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("APK App Store", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Discover, install and update apps in one place.", color = Muted, fontSize = 13.sp)
+                }
+                FilledTonalIconButton(
+                    onClick = { context.startActivity(Intent(context, AccountActivity::class.java)) },
+                    modifier = Modifier.size(46.dp)
+                ) {
+                    Icon(Icons.Default.Person, "Account")
+                }
+            }
+        }
         item {
             OutlinedTextField(
                 value = query,
@@ -367,7 +384,32 @@ private fun SettingsScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     var autoWifi by remember { mutableStateOf(StoreConfig.autoDownloadOnWifi(context)) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 30.dp)) {
-        item { Header("Settings", "Control update behavior and download security.") }
+        item { Header("Settings", "Control your account, updates and download security.") }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable {
+                    context.startActivity(Intent(context, AccountActivity::class.java))
+                },
+                colors = CardDefaults.cardColors(containerColor = Surface),
+                shape = RoundedCornerShape(22.dp)
+            ) {
+                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(46.dp).clip(RoundedCornerShape(15.dp)).background(Brush.linearGradient(listOf(Accent, Accent2))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Person, null, tint = Color.White)
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Account & profile", fontWeight = FontWeight.SemiBold)
+                        Text("Sign in, purchases, privacy and terms", color = Muted, fontSize = 12.sp)
+                    }
+                    Icon(Icons.Default.ChevronRight, null, tint = Muted)
+                }
+            }
+        }
+        item { Spacer(Modifier.height(12.dp)) }
         item {
             Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp), colors = CardDefaults.cardColors(containerColor = Surface), shape = RoundedCornerShape(22.dp)) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
