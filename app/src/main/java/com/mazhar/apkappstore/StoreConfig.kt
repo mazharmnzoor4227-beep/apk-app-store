@@ -1,20 +1,22 @@
 package com.mazhar.apkappstore
 
 import android.content.Context
+import java.util.UUID
 
 object StoreConfig {
     private const val PREFS = "apk_app_store"
-    private const val BACKEND = "backend_url"
     private const val WIFI_AUTO = "wifi_auto_download"
+    private const val CUSTOMER_KEY = "customer_key"
 
-    fun backendUrl(context: Context): String {
-        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(BACKEND, "") ?: ""
-        return saved.ifBlank { BuildConfig.DEFAULT_BACKEND_URL }.trimEnd('/')
-    }
+    fun backendUrl(context: Context): String = BuildConfig.DEFAULT_BACKEND_URL.trim().trimEnd('/')
 
-    fun setBackendUrl(context: Context, value: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(BACKEND, value.trim().trimEnd('/')).apply()
+    fun customerKey(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val saved = prefs.getString(CUSTOMER_KEY, "").orEmpty()
+        if (saved.isNotBlank()) return saved
+        val created = UUID.randomUUID().toString()
+        prefs.edit().putString(CUSTOMER_KEY, created).apply()
+        return created
     }
 
     fun autoDownloadOnWifi(context: Context): Boolean =
@@ -35,6 +37,10 @@ data class StoreApp(
     val category: String,
     val iconUrl: String,
     val featured: Boolean,
+    val isPaid: Boolean,
+    val pricePkr: Int,
+    val owned: Boolean,
+    val purchaseStatus: String,
     val versionCode: Long,
     val versionName: String,
     val minSdk: Int,
@@ -43,6 +49,15 @@ data class StoreApp(
     val sha256: String,
     val changelog: String,
     val screenshots: List<String> = emptyList()
+)
+
+data class PaymentMethod(
+    val id: Long,
+    val type: String,
+    val label: String,
+    val accountTitle: String,
+    val accountValue: String,
+    val instructions: String
 )
 
 data class InstalledState(
