@@ -14,13 +14,17 @@
         android:theme="@android:style/Theme.Material.NoActionBar">
 
         <activity
-            android:name=".StoreV2Activity"
+            android:name=".StoreV3Activity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".StoreV2Activity"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"
