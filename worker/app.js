@@ -57,7 +57,38 @@ function bearerToken(request) {
   const auth = request.headers.get("authorization") || "";
   return auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
 }
+let authSchemaReady = null;
+async function ensureAuthSchema(env) {
+  if (!authSchemaReady) authSchemaReady = (async () => {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      display_name TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)").run();
+  })();
+  return authSchemaReady;
+}
+async function authStatus(env) {
+  await ensureAuthSchema(env);
+  return json({ ok: true, auth: true, email_login: true, google_login_configured: !!env.GOOGLE_WEB_CLIENT_ID });
+}
 async function sessionUser(request, env) {
+  await ensureAuthSchema(env);
   const token = bearerToken(request);
   if (!token) return null;
   const tokenHash = await sha256Hex(token);
@@ -79,6 +110,7 @@ function publicUser(row) {
   return { id: Number(row.id), email: String(row.email), name: String(row.display_name || "") };
 }
 async function register(request, env) {
+  await ensureAuthSchema(env);
   const body = await request.json().catch(() => null);
   if (!body) return bad("Invalid JSON");
   const name = String(body.name || "").trim().slice(0, 80);
@@ -98,6 +130,7 @@ async function register(request, env) {
   return json({ ok: true, token: session.token, expires_at: session.expiresAt, user: { id: userId, email, name } }, 201);
 }
 async function login(request, env) {
+  await ensureAuthSchema(env);
   const body = await request.json().catch(() => null);
   if (!body) return bad("Invalid JSON");
   const email = emailValue(body.email);
@@ -216,6 +249,7 @@ export default {
         const url = new URL(request.url); url.pathname = "/admin.html";
         return env.ASSETS.fetch(new Request(url.toString(), request));
       }
+      if (path === "/api/auth/status" && request.method === "GET") return authStatus(env);
       if (path === "/api/auth/register" && request.method === "POST") return register(request, env);
       if (path === "/api/auth/login" && request.method === "POST") return login(request, env);
       if (path === "/api/auth/me" && request.method === "GET") return me(request, env);
