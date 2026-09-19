@@ -173,12 +173,47 @@ async function abortMultipart(request, env) {
   return json({ ok: true });
 }
 
+async function updateAdminAppState(request, env, id) {
+  if (!isAdmin(request, env)) return bad("Unauthorized", 401);
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body.published !== "boolean") return bad("published must be true or false");
+  const appId = Number(id);
+  const result = await env.DB.prepare("UPDATE apps SET published=?, updated_at=CURRENT_TIMESTAMP WHERE id=?")
+    .bind(body.published ? 1 : 0, appId).run();
+  if (!result.meta.changes) return bad("App not found", 404);
+  return json({ ok: true, id: appId, published: body.published });
+}
+
+async function deleteAdminApp(request, env, id) {
+  if (!isAdmin(request, env)) return bad("Unauthorized", 401);
+  const appId = Number(id);
+  const app = await env.DB.prepare("SELECT id,name,icon_key FROM apps WHERE id=? LIMIT 1").bind(appId).first();
+  if (!app) return bad("App not found", 404);
+
+  const [releaseRows, screenshotRows] = await Promise.all([
+    env.DB.prepare("SELECT apk_key FROM releases WHERE app_id=?").bind(appId).all(),
+    env.DB.prepare("SELECT file_key FROM screenshots WHERE app_id=?").bind(appId).all()
+  ]);
+  const keys = new Set();
+  if (app.icon_key) keys.add(String(app.icon_key));
+  for (const row of releaseRows.results || []) if (row.apk_key) keys.add(String(row.apk_key));
+  for (const row of screenshotRows.results || []) if (row.file_key) keys.add(String(row.file_key));
+
+  await Promise.allSettled([...keys].map(key => env.FILES.delete(key)));
+  await env.DB.prepare("DELETE FROM downloads WHERE app_id=?").bind(appId).run();
+  await env.DB.prepare("DELETE FROM purchases WHERE app_id=?").bind(appId).run();
+  await env.DB.prepare("DELETE FROM screenshots WHERE app_id=?").bind(appId).run();
+  await env.DB.prepare("DELETE FROM releases WHERE app_id=?").bind(appId).run();
+  await env.DB.prepare("DELETE FROM apps WHERE id=?").bind(appId).run();
+  return json({ ok: true, deleted_id: appId, name: String(app.name || "") });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname;
     try {
       if ((path === "/admin" || path === "/admin/") && (request.method === "GET" || request.method === "HEAD")) {
-        const url = new URL(request.url); url.pathname = "/admin-v2.html";
+        const url = new URL(request.url); url.pathname = "/admin.html";
         return env.ASSETS.fetch(new Request(url.toString(), request));
       }
       if (path === "/api/auth/register" && request.method === "POST") return register(request, env);
@@ -189,6 +224,9 @@ export default {
       if (path === "/api/admin/multipart/part" && request.method === "PUT") return uploadPart(request, env);
       if (path === "/api/admin/multipart/complete" && request.method === "POST") return completeMultipart(request, env);
       if (path === "/api/admin/multipart/abort" && request.method === "POST") return abortMultipart(request, env);
+      const adminAppMatch = path.match(/^\/api\/admin\/apps\/(\d+)$/);
+      if (adminAppMatch && request.method === "PUT") return updateAdminAppState(request, env, adminAppMatch[1]);
+      if (adminAppMatch && request.method === "DELETE") return deleteAdminApp(request, env, adminAppMatch[1]);
       const effective = (path.startsWith("/api/") || path.startsWith("/files/")) ? await withAccountIdentity(request, env) : request;
       return core.fetch(effective, env, ctx);
     } catch (error) {
