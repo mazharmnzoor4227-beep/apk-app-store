@@ -57,7 +57,7 @@ object StoreApi {
         return client.newCall(req).execute().use { response ->
             val text = response.body?.string().orEmpty()
             val root = runCatching { JSONObject(text) }.getOrElse { JSONObject() }
-            if (!response.isSuccessful) error(root.optString("error", "Account request failed"))
+            if (!response.isSuccessful) error(root.optString("error").ifBlank { "Account service error (${response.code})" })
             val token = root.optString("token")
             val user = root.optJSONObject("user") ?: error("Invalid account response")
             if (token.isBlank()) error("Invalid account session")

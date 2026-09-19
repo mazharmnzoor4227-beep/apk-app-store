@@ -247,7 +247,7 @@ private fun EmailSignInScreen(
     onBack: () -> Unit,
     onSubmit: (Boolean, String, String, String) -> Unit
 ) {
-    var createAccount by remember { mutableStateOf(false) }
+    var createAccount by remember { mutableStateOf(true) }
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }

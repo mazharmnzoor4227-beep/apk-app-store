@@ -229,10 +229,10 @@ private fun StoreRoot() {
             Box(Modifier.padding(padding).fillMaxSize()) {
                 when (tab) {
                     StoreTab.Home -> HomeScreen(apps, loading, error, progress, { details = it }, ::action, ::reload, { tab = StoreTab.Search })
-                    StoreTab.Categories -> CategoriesScreen(apps, { details = it }, ::action)
-                    StoreTab.Search -> SearchScreen(apps, query, { query = it }, { details = it }, ::action)
-                    StoreTab.Downloads -> DownloadsScreenV4(apps, progress, downloaded, { details = it }, ::action)
-                    StoreTab.Profile -> ProfileScreen(apps, { details = it }, ::action)
+                    StoreTab.Categories -> CategoriesScreen(apps, { details = it }, ::action) { tab = StoreTab.Home }
+                    StoreTab.Search -> SearchScreen(apps, query, { query = it }, { details = it }, ::action) { query = ""; tab = StoreTab.Home }
+                    StoreTab.Downloads -> DownloadsScreenV4(apps, progress, downloaded, { details = it }, ::action) { tab = StoreTab.Home }
+                    StoreTab.Profile -> ProfileScreen(apps, { details = it }, ::action, { tab = StoreTab.Home }, { tab = StoreTab.Downloads })
                 }
             }
         }
@@ -440,11 +440,11 @@ private fun AppDetailsScreen(app: StoreApp, pct: Int?, onBack: () -> Unit, onAct
 @Composable private fun SectionTitle(title: String) { Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 10.dp)) }
 
 @Composable
-private fun CategoriesScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit) {
+private fun CategoriesScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit, onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val categories = apps.map { it.category.ifBlank { "Apps" } }.distinct()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 30.dp)) {
-        item { PageHeader("Categories", "Browse by type") }
+        item { PageHeader("Categories", "Browse by type", onBack) }
         items(categories) { category ->
             SectionTitle(category)
             apps.filter { it.category.ifBlank { "Apps" } == category }.forEach { app -> AppRow(app, StoreApi.installedState(context, app), null, { onOpen(app) }, { onAction(app) }) }
@@ -454,11 +454,11 @@ private fun CategoriesScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, o
 }
 
 @Composable
-private fun SearchScreen(apps: List<StoreApp>, query: String, onQuery: (String) -> Unit, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit) {
+private fun SearchScreen(apps: List<StoreApp>, query: String, onQuery: (String) -> Unit, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit, onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val result = apps.filter { query.isBlank() || it.name.contains(query, true) || it.category.contains(query, true) || it.shortDescription.contains(query, true) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 30.dp)) {
-        item { PageHeader("Search", "Find your favorite apps") }
+        item { PageHeader("Search", "Find your favorite apps", onBack) }
         item { OutlinedTextField(query, onQuery, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), placeholder = { Text("Search apps & games") }, leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true, shape = RoundedCornerShape(22.dp)) }
         item { Spacer(Modifier.height(16.dp)) }
         items(result, key = { it.slug }) { app -> AppRow(app, StoreApi.installedState(context, app), null, { onOpen(app) }, { onAction(app) }) }
@@ -467,23 +467,23 @@ private fun SearchScreen(apps: List<StoreApp>, query: String, onQuery: (String) 
 }
 
 @Composable
-private fun DownloadsScreenV4(apps: List<StoreApp>, progress: SnapshotStateMap<String, Int>, downloaded: SnapshotStateMap<String, File>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit) {
+private fun DownloadsScreenV4(apps: List<StoreApp>, progress: SnapshotStateMap<String, Int>, downloaded: SnapshotStateMap<String, File>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit, onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val visible = apps.filter { progress.containsKey(it.slug) || downloaded.containsKey(it.slug) || StoreApi.installedState(context, it).installed }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 30.dp)) {
-        item { PageHeader("My Apps", "Downloads, installed apps and updates") }
+        item { PageHeader("My Apps", "Downloads, installed apps and updates", onBack) }
         items(visible, key = { it.slug }) { app -> AppRow(app, StoreApi.installedState(context, app), progress[app.slug], { onOpen(app) }, { onAction(app) }) }
         if (visible.isEmpty()) item { Notice("Your downloaded and installed apps will appear here.") }
     }
 }
 
 @Composable
-private fun ProfileScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit) {
+private fun ProfileScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit, onBack: () -> Unit, onDownloads: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val account = StoreConfig.account(context)
     val owned = apps.filter { it.owned && it.isPaid }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 30.dp)) {
-        item { PageHeader("My Profile", "Account, purchases and settings") }
+        item { PageHeader("My Profile", "Account, purchases and settings", onBack) }
         item {
             Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable { context.startActivity(Intent(context, AccountActivity::class.java)) }, colors = CardDefaults.cardColors(containerColor = StorePanel), shape = RoundedCornerShape(22.dp)) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -496,9 +496,9 @@ private fun ProfileScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAc
         }
         item { Spacer(Modifier.height(14.dp)) }
         item { ProfileTile("Account & security", Icons.Default.Security) { context.startActivity(Intent(context, AccountActivity::class.java)) } }
-        item { ProfileTile("Purchased apps", Icons.Default.ShoppingBag) { } }
-        item { ProfileTile("Updates", Icons.Default.SystemUpdate) { } }
-        item { ProfileTile("Help & support", Icons.Default.Help) { } }
+        item { ProfileTile("Purchased apps", Icons.Default.ShoppingBag) { context.startActivity(Intent(context, AccountActivity::class.java)) } }
+        item { ProfileTile("Updates", Icons.Default.SystemUpdate, onDownloads) }
+        item { ProfileTile("Help & support", Icons.Default.Help) { context.startActivity(Intent(context, AccountActivity::class.java)) } }
         if (owned.isNotEmpty()) item { SectionTitle("Purchased") }
         items(owned, key = { it.slug }) { app -> AppRow(app, StoreApi.installedState(context, app), null, { onOpen(app) }, { onAction(app) }) }
     }
@@ -510,7 +510,19 @@ private fun ProfileScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAc
     }
 }
 
-@Composable private fun PageHeader(title: String, subtitle: String) { Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) { Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = StoreMuted, fontSize = 12.sp) } }
+@Composable
+private fun PageHeader(title: String, subtitle: String, onBack: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 12.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (onBack != null) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) }
+            Spacer(Modifier.width(4.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = StoreMuted, fontSize = 12.sp)
+        }
+    }
+}
 
 @Composable
 private fun PaymentDialog(app: StoreApp, onDismiss: () -> Unit, onSubmitted: () -> Unit) {
