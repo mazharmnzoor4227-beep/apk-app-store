@@ -1,0 +1,71 @@
+name: Repair Account Backend
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repair-auth-backend.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Harden auth schema and status endpoint
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('worker/app.js')
+          s = p.read_text()
+          marker = 'async function sessionUser(request, env) {'
+          if 'async function ensureAuthSchema(env)' not in s:
+              ensure = '''let authSchemaReady = null;
+          async function ensureAuthSchema(env) {
+            if (!authSchemaReady) authSchemaReady = (async () => {
+              await env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                display_name TEXT NOT NULL,
+                password_salt TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+              )`).run();
+              await env.DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at INTEGER NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+              )`).run();
+              await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash)").run();
+              await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)").run();
+              await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)").run();
+            })();
+            return authSchemaReady;
+          }
+          async function authStatus(env) {
+            await ensureAuthSchema(env);
+            return json({ ok: true, auth: true, email_login: true, google_login_configured: !!env.GOOGLE_WEB_CLIENT_ID });
+          }
+          '''
+              if marker not in s:
+                  raise SystemExit('sessionUser marker not found')
+              s = s.replace(marker, ensure + marker)
+          s = s.replace('async function sessionUser(request, env) {\n  const token = bearerToken(request);', 'async function sessionUser(request, env) {\n  await ensureAuthSchema(env);\n  const token = bearerToken(request);')
+          s = s.replace('async function register(request, env) {\n  const body = await request.json().catch(() => null);', 'async function register(request, env) {\n  await ensureAuthSchema(env);\n  const body = await request.json().catch(() => null);')
+          s = s.replace('async function login(request, env) {\n  const body = await request.json().catch(() => null);', 'async function login(request, env) {\n  await ensureAuthSchema(env);\n  const body = await request.json().catch(() => null);')
+          route = '      if (path === "/api/auth/register" && request.method === "POST") return register(request, env);'
+          if '/api/auth/status' not in s:
+              s = s.replace(route, '      if (path === "/api/auth/status" && request.method === "GET") return authStatus(env);\n' + route)
+          p.write_text(s)
+      - name: Validate JavaScript
+        run: node --check worker/app.js && node --check worker/index.js
+      - name: Commit auth repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add worker/app.js
+          git commit -m "Harden email signup and account sessions"
+          git push
