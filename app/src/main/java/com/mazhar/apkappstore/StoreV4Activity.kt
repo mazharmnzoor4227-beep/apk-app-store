@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -163,6 +164,14 @@ private fun StoreRoot() {
     val downloaded = remember { mutableStateMapOf<String, File>() }
 
     fun reload() { refresh++ }
+
+    BackHandler(enabled = purchase != null || details != null || tab != StoreTab.Home) {
+        when {
+            purchase != null -> purchase = null
+            details != null -> details = null
+            tab != StoreTab.Home -> tab = StoreTab.Home
+        }
+    }
 
     LaunchedEffect(refresh) {
         loading = true
