@@ -1,0 +1,105 @@
+name: Repair Android Navigation
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repair-android-navigation.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch navigation and account UI
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          p = Path('app/src/main/java/com/mazhar/apkappstore/StoreV4Activity.kt')
+          s = p.read_text()
+          s = s.replace(
+          '''    BackHandler(enabled = purchase != null || details != null || tab != StoreTab.Home) {
+              when {
+                  purchase != null -> purchase = null
+                  details != null -> details = null
+                  tab != StoreTab.Home -> tab = StoreTab.Home
+              }
+          }''',
+          '''    BackHandler(enabled = purchase != null || details != null || tab != StoreTab.Home || query.isNotBlank()) {
+              when {
+                  purchase != null -> purchase = null
+                  details != null -> details = null
+                  tab == StoreTab.Search && query.isNotBlank() -> query = ""
+                  tab != StoreTab.Home -> { query = ""; tab = StoreTab.Home }
+              }
+          }''')
+          s = s.replace('StoreTab.Categories -> CategoriesScreen(apps, { details = it }, ::action)', 'StoreTab.Categories -> CategoriesScreen(apps, { details = it }, ::action) { tab = StoreTab.Home }')
+          s = s.replace('StoreTab.Search -> SearchScreen(apps, query, { query = it }, { details = it }, ::action)', 'StoreTab.Search -> SearchScreen(apps, query, { query = it }, { details = it }, ::action) { query = ""; tab = StoreTab.Home }')
+          s = s.replace('StoreTab.Downloads -> DownloadsScreenV4(apps, progress, downloaded, { details = it }, ::action)', 'StoreTab.Downloads -> DownloadsScreenV4(apps, progress, downloaded, { details = it }, ::action) { tab = StoreTab.Home }')
+          s = s.replace('StoreTab.Profile -> ProfileScreen(apps, { details = it }, ::action)', 'StoreTab.Profile -> ProfileScreen(apps, { details = it }, ::action, { tab = StoreTab.Home }, { tab = StoreTab.Downloads })')
+          s = s.replace('private fun CategoriesScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit) {', 'private fun CategoriesScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit, onBack: () -> Unit) {')
+          s = s.replace('item { PageHeader("Categories", "Browse by type") }', 'item { PageHeader("Categories", "Browse by type", onBack) }')
+          s = s.replace('private fun SearchScreen(apps: List<StoreApp>, query: String, onQuery: (String) -> Unit, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit) {', 'private fun SearchScreen(apps: List<StoreApp>, query: String, onQuery: (String) -> Unit, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit, onBack: () -> Unit) {')
+          s = s.replace('item { PageHeader("Search", "Find your favorite apps") }', 'item { PageHeader("Search", "Find your favorite apps", onBack) }')
+          s = s.replace('private fun DownloadsScreenV4(apps: List<StoreApp>, progress: SnapshotStateMap<String, Int>, downloaded: SnapshotStateMap<String, File>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit) {', 'private fun DownloadsScreenV4(apps: List<StoreApp>, progress: SnapshotStateMap<String, Int>, downloaded: SnapshotStateMap<String, File>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit, onBack: () -> Unit) {')
+          s = s.replace('item { PageHeader("My Apps", "Downloads, installed apps and updates") }', 'item { PageHeader("My Apps", "Downloads, installed apps and updates", onBack) }')
+          s = s.replace('private fun ProfileScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit) {', 'private fun ProfileScreen(apps: List<StoreApp>, onOpen: (StoreApp) -> Unit, onAction: (StoreApp) -> Unit, onBack: () -> Unit, onDownloads: () -> Unit) {')
+          s = s.replace('item { PageHeader("My Profile", "Account, purchases and settings") }', 'item { PageHeader("My Profile", "Account, purchases and settings", onBack) }')
+          s = s.replace('item { ProfileTile("Purchased apps", Icons.Default.ShoppingBag) { } }', 'item { ProfileTile("Purchased apps", Icons.Default.ShoppingBag) { context.startActivity(Intent(context, AccountActivity::class.java)) } }')
+          s = s.replace('item { ProfileTile("Updates", Icons.Default.SystemUpdate) { } }', 'item { ProfileTile("Updates", Icons.Default.SystemUpdate, onDownloads) }')
+          s = s.replace('item { ProfileTile("Help & support", Icons.Default.Help) { } }', 'item { ProfileTile("Help & support", Icons.Default.Help) { context.startActivity(Intent(context, AccountActivity::class.java)) } }')
+          old = '@Composable private fun PageHeader(title: String, subtitle: String) { Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) { Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = StoreMuted, fontSize = 12.sp) } }'
+          new = '''@Composable
+          private fun PageHeader(title: String, subtitle: String, onBack: (() -> Unit)? = null) {
+              Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 12.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                  if (onBack != null) {
+                      IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) }
+                      Spacer(Modifier.width(4.dp))
+                  }
+                  Column(Modifier.weight(1f)) {
+                      Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                      Text(subtitle, color = StoreMuted, fontSize = 12.sp)
+                  }
+              }
+          }'''
+          if old not in s:
+              raise SystemExit('PageHeader pattern not found')
+          s = s.replace(old, new)
+          p.write_text(s)
+
+          p = Path('app/src/main/java/com/mazhar/apkappstore/AccountActivity.kt')
+          s = p.read_text().replace('var createAccount by remember { mutableStateOf(false) }','var createAccount by remember { mutableStateOf(true) }')
+          p.write_text(s)
+
+          p = Path('app/src/main/java/com/mazhar/apkappstore/StoreApi.kt')
+          s = p.read_text().replace('if (!response.isSuccessful) error(root.optString("error", "Account request failed"))','if (!response.isSuccessful) error(root.optString("error").ifBlank { "Account service error (${response.code})" })')
+          p.write_text(s)
+
+          p = Path('app/build.gradle.kts')
+          s = p.read_text()
+          s = re.sub(r'versionCode = \d+', 'versionCode = 9', s)
+          s = re.sub(r'versionName = "[^"]+"', 'versionName = "1.8.0"', s)
+          p.write_text(s)
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/mazhar/apkappstore/StoreV4Activity.kt app/src/main/java/com/mazhar/apkappstore/AccountActivity.kt app/src/main/java/com/mazhar/apkappstore/StoreApi.kt app/build.gradle.kts
+          git commit -m "Fix back navigation and account signup UX"
+          git push
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-app-store-v1.8.0
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
