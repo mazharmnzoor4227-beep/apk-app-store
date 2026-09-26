@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "owner": "mazharmnzoor4227-beep",
-  "generated_at": "2026-09-26T14:12:07Z",
-  "app_count": 6,
+  "generated_at": "2026-09-26T14:16:08Z",
+  "app_count": 7,
   "apps": [
     {
       "slug": "com.example.aiagent",
@@ -83,6 +83,33 @@
       "source_release_tag": "store-com.blackhole.app-v6-617aa5f",
       "published_at": "2026-09-26T14:05:43Z",
       "commit_sha": "617aa5fe868f2604dfac6b13607931286cd3d2f5",
+      "signing_sha256": ""
+    },
+    {
+      "slug": "app.nexus.nexus_ai",
+      "package_name": "app.nexus.nexus_ai",
+      "name": "Nexus AI",
+      "short_description": "Nexus AI from nexus-ai-mobile-.",
+      "description": "Automatically published from mazharmnzoor4227-beep/nexus-ai-mobile-.",
+      "category": "Tools",
+      "icon_url": "",
+      "featured": false,
+      "is_paid": false,
+      "price_pkr": 0,
+      "owned": true,
+      "purchase_status": "free",
+      "version_code": 1,
+      "version_name": "1.0.0",
+      "min_sdk": 33,
+      "download_url": "https://github.com/mazharmnzoor4227-beep/nexus-ai-mobile-/releases/download/store-app.nexus.nexus_ai-v1-c2f309f/app.nexus.nexus_ai-1.0.0.apk",
+      "file_size": 187951691,
+      "sha256": "38ffef59d30ef56e0c61852809053f1a3a0010056ad205de5b14e7ba8b4ae3cd",
+      "changelog": "Keep Nexus AI APK signing stable for updates",
+      "screenshots": [],
+      "source_repo": "mazharmnzoor4227-beep/nexus-ai-mobile-",
+      "source_release_tag": "store-app.nexus.nexus_ai-v1-c2f309f",
+      "published_at": "2026-09-26T14:15:07Z",
+      "commit_sha": "c2f309fd027f50bac6503e3d1b153c58d40f6b59",
       "signing_sha256": ""
     },
     {
