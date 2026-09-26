@@ -12,10 +12,16 @@ object StoreConfig {
     private const val ACCOUNT_NAME = "account_name"
     private const val ACCOUNT_EMAIL = "account_email"
     private const val LIVE_BACKEND = "https://apk-app-store.mazharmnzoor4227.workers.dev"
+    private const val LIVE_CATALOG = "https://raw.githubusercontent.com/mazharmnzoor4227-beep/apk-app-store/main/catalog/catalog.json"
 
     fun backendUrl(context: Context): String {
         val configured = BuildConfig.DEFAULT_BACKEND_URL.trim().trimEnd('/')
         return configured.ifBlank { LIVE_BACKEND }
+    }
+
+    fun catalogUrl(): String {
+        val configured = BuildConfig.DEFAULT_CATALOG_URL.trim()
+        return configured.ifBlank { LIVE_CATALOG }
     }
 
     fun customerKey(context: Context): String {

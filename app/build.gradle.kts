@@ -9,6 +9,9 @@ plugins {
 val storeBackendUrl = providers.gradleProperty("STORE_BACKEND_URL")
     .orElse("https://apk-app-store.mazharmnzoor4227.workers.dev")
     .get()
+val storeCatalogUrl = providers.gradleProperty("STORE_CATALOG_URL")
+    .orElse("https://raw.githubusercontent.com/mazharmnzoor4227-beep/apk-app-store/main/catalog/catalog.json")
+    .get()
 val generatedIconResDir = layout.buildDirectory.dir("generated/iconRes")
 val generateStoreIcon = tasks.register("generateStoreIcon") {
     val source = layout.projectDirectory.file("icon-art.b64")
@@ -30,10 +33,11 @@ android {
         applicationId = "com.mazhar.apkappstore"
         minSdk = 29
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.8.0"
+        versionCode = 10
+        versionName = "1.9.0"
 
         buildConfigField("String", "DEFAULT_BACKEND_URL", "\"${storeBackendUrl.replace("\"", "\\\"")}\"")
+        buildConfigField("String", "DEFAULT_CATALOG_URL", "\"${storeCatalogUrl.replace("\"", "\\\"")}\"")
     }
 
     sourceSets.getByName("main").res.srcDir(generatedIconResDir)

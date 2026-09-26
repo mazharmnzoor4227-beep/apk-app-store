@@ -25,12 +25,15 @@ object AppDownloader {
         require(app.downloadUrl.startsWith("https://") || app.downloadUrl.startsWith("http://")) { "App is not unlocked for download" }
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(dir, "${app.packageName}-${app.versionCode}.apk")
-        val request = Request.Builder()
+        val requestBuilder = Request.Builder()
             .url(app.downloadUrl)
-            .header("x-customer-key", StoreConfig.customerKey(context))
             .get()
-            .build()
-        StoreApi.client().newCall(request).execute().use { response ->
+        if (app.downloadUrl.startsWith(StoreConfig.backendUrl(context))) {
+            requestBuilder.header("x-customer-key", StoreConfig.customerKey(context))
+            val token = StoreConfig.authToken(context)
+            if (token.isNotBlank()) requestBuilder.header("Authorization", "Bearer $token")
+        }
+        StoreApi.client().newCall(requestBuilder.build()).execute().use { response ->
             if (!response.isSuccessful) {
                 if (response.code == 402) error("Purchase approval is required before downloading this app")
                 error("Download failed: ${response.code}")

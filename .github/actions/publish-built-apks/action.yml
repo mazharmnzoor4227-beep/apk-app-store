@@ -1,0 +1,24 @@
+name: Publish built APKs to APK App Store
+description: Finds APK artifacts for the caller commit and publishes store-ready GitHub Releases with metadata.
+inputs:
+  github-token:
+    description: Caller repository GITHUB_TOKEN
+    required: true
+  source-sha:
+    description: Commit SHA whose successful APK artifacts should be published
+    required: false
+    default: ${{ github.sha }}
+  wait-seconds:
+    description: Maximum time to wait for another workflow to finish uploading APK artifacts
+    required: false
+    default: '900'
+runs:
+  using: composite
+  steps:
+    - name: Publish APK artifacts
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        SOURCE_SHA: ${{ inputs.source-sha }}
+        WAIT_SECONDS: ${{ inputs.wait-seconds }}
+      run: python3 "$GITHUB_ACTION_PATH/publish.py"
