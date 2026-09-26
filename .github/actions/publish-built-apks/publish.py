@@ -63,6 +63,9 @@ def parse(apk:Path)->dict[str,Any]:
     if not m: raise RuntimeError('package metadata missing')
     label=re.search(r"^application-label:'([^']*)'",t,re.M) or re.search(r"^application:\s+label='([^']*)'",t,re.M); sdk=re.search(r"^sdkVersion:'(\d+)'",t,re.M); icon=re.search(r"^application:\s+.*?icon='([^']+)'",t,re.M); ok,cert=signed(apk)
     return {'apk':apk,'package_name':m.group(1),'version_code':int(m.group(2)),'version_name':m.group(3) or m.group(2),'name':(label.group(1).strip() if label else '') or m.group(1).split('.')[-1],'min_sdk':int(sdk.group(1)) if sdk else 21,'icon_path':icon.group(1) if icon else '','signed':ok,'signing_sha256':cert,'size':apk.stat().st_size}
+def is_test_package(i:dict[str,Any])->bool:
+    package=str(i.get('package_name') or '').lower(); filename=Path(i['apk']).name.lower()
+    return package.endswith(('.test','.androidtest')) or 'androidtest' in filename or 'android-test' in filename or filename.endswith('-test.apk')
 def score(i:dict[str,Any])->tuple[int,int,int,int]:
     n=i['apk'].name.lower(); return (1 if i['signed'] else 0,2 if 'universal' in n else (1 if 'release' in n else 0),1 if 'debug' not in n else 0,int(i['size']))
 def slug(v:str)->str:return (re.sub(r'[^a-z0-9._-]+','-',v.lower().strip()).strip('-')[:80] or 'app')
@@ -99,12 +102,13 @@ def main()->int:
         for a in apks:
             try:
                 i=parse(a)
-                if i['signed']: parsed.append(i)
+                if i['signed'] and not is_test_package(i): parsed.append(i)
+                elif is_test_package(i): print(f'Skipping Android test APK: {a}')
             except Exception as e: print(f'Skipping {a}: {e}')
         best={}
         for i in parsed:
             p=i['package_name']; best[p]=i if p not in best or score(i)>score(best[p]) else best[p]
-        if not best: print('No signed APKs found.'); return 0
+        if not best: print('No signed app APKs found.'); return 0
         meta=gh_json(f'repos/{REPO}'); repo_name=str(meta.get('name') or REPO.split('/')[-1]); desc=str(meta.get('description') or '').strip()
         try: change=str(gh_json(f'repos/{REPO}/commits/{SHA}').get('commit',{}).get('message','')).strip()[:1500]
         except Exception: change=''
