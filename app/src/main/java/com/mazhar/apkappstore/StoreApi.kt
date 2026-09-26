@@ -84,16 +84,100 @@ object StoreApi {
     }
 
     suspend fun apps(context: Context): List<StoreApp> = withContext(Dispatchers.IO) {
+        val backend = runCatching { backendApps(context) }
+        val github = runCatching { githubCatalogApps() }
+
+        if (backend.isFailure && github.isFailure) {
+            val message = listOfNotNull(
+                backend.exceptionOrNull()?.message,
+                github.exceptionOrNull()?.message
+            ).distinct().joinToString(" • ")
+            error(message.ifBlank { "Could not load the store." })
+        }
+
+        mergeApps(
+            backend.getOrDefault(emptyList()),
+            github.getOrDefault(emptyList())
+        )
+    }
+
+    private fun backendApps(context: Context): List<StoreApp> {
         val base = base(context)
         val req = request(context, "$base/api/apps").get().build()
-        client.newCall(req).execute().use { response ->
+        return client.newCall(req).execute().use { response ->
             if (!response.isSuccessful) error("Store API ${response.code}")
             val root = JSONObject(response.body?.string().orEmpty())
-            val items = root.optJSONArray("apps") ?: JSONArray()
-            buildList {
-                for (i in 0 until items.length()) add(parseApp(items.getJSONObject(i), base))
+            parseApps(root, base)
+        }
+    }
+
+    private fun githubCatalogApps(): List<StoreApp> {
+        val url = StoreConfig.catalogUrl()
+        if (url.isBlank()) return emptyList()
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", "APK-App-Store/${BuildConfig.VERSION_NAME}")
+            .header("Cache-Control", "no-cache")
+            .get()
+            .build()
+        return client.newCall(req).execute().use { response ->
+            if (!response.isSuccessful) error("GitHub catalog ${response.code}")
+            val root = JSONObject(response.body?.string().orEmpty())
+            parseApps(root, "")
+        }
+    }
+
+    private fun parseApps(root: JSONObject, base: String): List<StoreApp> {
+        val items = root.optJSONArray("apps") ?: JSONArray()
+        return buildList {
+            for (i in 0 until items.length()) {
+                val parsed = parseApp(items.getJSONObject(i), base)
+                if (
+                    parsed.slug.isNotBlank() &&
+                    (parsed.downloadUrl.startsWith("https://") || (parsed.isPaid && !parsed.owned))
+                ) add(parsed)
             }
         }
+    }
+
+    private fun mergeApps(backend: List<StoreApp>, github: List<StoreApp>): List<StoreApp> {
+        val merged = linkedMapOf<String, StoreApp>()
+
+        fun key(app: StoreApp): String =
+            app.packageName.trim().ifBlank { app.slug.trim() }.lowercase()
+
+        github.forEach { app ->
+            val k = key(app)
+            val current = merged[k]
+            if (current == null || app.versionCode > current.versionCode) merged[k] = app
+        }
+
+        backend.forEach { app ->
+            val k = key(app)
+            val catalog = merged[k]
+            merged[k] = when {
+                catalog == null -> app
+                app.isPaid -> app
+                app.versionCode >= catalog.versionCode -> app
+                else -> catalog.copy(
+                    name = app.name.ifBlank { catalog.name },
+                    shortDescription = app.shortDescription.ifBlank { catalog.shortDescription },
+                    description = app.description.ifBlank { catalog.description },
+                    category = app.category.ifBlank { catalog.category },
+                    iconUrl = app.iconUrl.ifBlank { catalog.iconUrl },
+                    featured = app.featured || catalog.featured,
+                    screenshots = if (app.screenshots.isNotEmpty()) app.screenshots else catalog.screenshots
+                )
+            }
+        }
+
+        return merged.values
+            .filter {
+                it.packageName.isNotBlank() &&
+                    it.versionCode > 0 &&
+                    (it.downloadUrl.startsWith("https://") || (it.isPaid && !it.owned))
+            }
+            .sortedWith(compareByDescending<StoreApp> { it.featured }.thenBy { it.name.lowercase() })
     }
 
     suspend fun paymentMethods(context: Context): List<PaymentMethod> = withContext(Dispatchers.IO) {
@@ -150,6 +234,7 @@ object StoreApi {
         fun absolute(value: String): String = when {
             value.isBlank() -> ""
             value.startsWith("http://") || value.startsWith("https://") -> value
+            base.isBlank() -> value
             else -> "$base${if (value.startsWith('/')) value else "/$value"}"
         }
         val shots = mutableListOf<String>()

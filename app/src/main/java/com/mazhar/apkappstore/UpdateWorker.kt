@@ -14,7 +14,6 @@ import androidx.work.WorkerParameters
 
 class UpdateWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        if (StoreConfig.backendUrl(applicationContext).isBlank()) return Result.success()
         return try {
             val apps = StoreApi.apps(applicationContext)
             val updates = apps.filter { it.owned && StoreApi.installedState(applicationContext, it).updateAvailable }
@@ -37,7 +36,7 @@ class UpdateWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
                     pendingIntent = pending
                 )
             } else {
-                val open = Intent(applicationContext, MainActivity::class.java)
+                val open = Intent(applicationContext, StoreV4Activity::class.java)
                 val pending = PendingIntent.getActivity(
                     applicationContext,
                     2102,

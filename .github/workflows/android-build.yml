@@ -1,6 +1,13 @@
 name: Build APK App Store
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/android-build.yml'
   push:
     branches: [main]
     paths:
