@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "owner": "mazharmnzoor4227-beep",
-  "generated_at": "2026-09-26T14:16:08Z",
-  "app_count": 7,
+  "generated_at": "2026-09-26T17:42:43Z",
+  "app_count": 8,
   "apps": [
     {
       "slug": "com.example.aiagent",
@@ -56,6 +56,33 @@
       "source_release_tag": "store-com.mazhar.apkappstore-v11-48c57d2",
       "published_at": "2026-09-26T14:06:01Z",
       "commit_sha": "48c57d22476b308863208ef59e3b01f3006c34c4",
+      "signing_sha256": ""
+    },
+    {
+      "slug": "com.blackhole.downloader",
+      "package_name": "com.blackhole.downloader",
+      "name": "BLACK HOLE",
+      "short_description": "BLACK HOLE from black-hole-video-downloader.",
+      "description": "Automatically published from mazharmnzoor4227-beep/black-hole-video-downloader.",
+      "category": "Photo & Video",
+      "icon_url": "https://github.com/mazharmnzoor4227-beep/black-hole-video-downloader/releases/download/store-com.blackhole.downloader-v3-55c8ee7/com.blackhole.downloader-icon.webp",
+      "featured": false,
+      "is_paid": false,
+      "price_pkr": 0,
+      "owned": true,
+      "purchase_status": "free",
+      "version_code": 3,
+      "version_name": "1.2.0",
+      "min_sdk": 28,
+      "download_url": "https://github.com/mazharmnzoor4227-beep/black-hole-video-downloader/releases/download/store-com.blackhole.downloader-v3-55c8ee7/com.blackhole.downloader-1.2.0.apk",
+      "file_size": 54660,
+      "sha256": "57d2a591c293459c9cd3d476eba17476b1912fb4dc126f94f204b70903322c02",
+      "changelog": "Keep BLACK HOLE APK signing stable for updates",
+      "screenshots": [],
+      "source_repo": "mazharmnzoor4227-beep/black-hole-video-downloader",
+      "source_release_tag": "store-com.blackhole.downloader-v3-55c8ee7",
+      "published_at": "2026-09-26T14:23:14Z",
+      "commit_sha": "55c8ee75940ce690de5502ad9827632df5dce335",
       "signing_sha256": ""
     },
     {
