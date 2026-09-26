@@ -3,6 +3,7 @@ name: Sync GitHub APK Catalog
 on:
   workflow_dispatch:
   schedule:
+    # Frequent scan keeps newly published APK releases discoverable without a server.
     - cron: '7,22,37,52 * * * *'
   push:
     branches: [main]
