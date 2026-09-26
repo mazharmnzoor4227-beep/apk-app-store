@@ -26,6 +26,8 @@ def valid(raw:dict[str,Any])->dict[str,Any]|None:
     package=str(raw.get('package_name') or '').strip(); slug=str(raw.get('slug') or '').strip(); name=str(raw.get('name') or '').strip(); dl=str(raw.get('download_url') or '').strip()
     try:vc=int(raw.get('version_code') or 0)
     except Exception:vc=0
+    package_lower=package.lower()
+    if package_lower.endswith(('.test','.androidtest')):return None
     if not package or not slug or not name or vc<=0 or not dl.startswith('https://github.com/'):return None
     return {'slug':slug,'package_name':package,'name':name,'short_description':str(raw.get('short_description') or ''),'description':str(raw.get('description') or ''),'category':str(raw.get('category') or 'Apps'),'icon_url':str(raw.get('icon_url') or ''),'featured':bool(raw.get('featured',False)),'is_paid':False,'price_pkr':0,'owned':True,'purchase_status':'free','version_code':vc,'version_name':str(raw.get('version_name') or vc),'min_sdk':int(raw.get('min_sdk') or 21),'download_url':dl,'file_size':int(raw.get('file_size') or 0),'sha256':str(raw.get('sha256') or '').lower(),'changelog':str(raw.get('changelog') or ''),'screenshots':[str(x) for x in (raw.get('screenshots') or []) if str(x).startswith('https://')],'source_repo':str(raw.get('source_repo') or ''),'source_release_tag':str(raw.get('source_release_tag') or ''),'published_at':str(raw.get('published_at') or ''),'commit_sha':str(raw.get('commit_sha') or ''),'signing_sha256':str(raw.get('signing_sha256') or '').lower()}
 def apps_from_release(repo:str,release:dict[str,Any])->list[dict[str,Any]]:
